@@ -1,11 +1,11 @@
 import { Prisma, type Reservation, type ReservationSource, type ReservationStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { findFreeTable, generateSlots } from "@/lib/availability";
+import { findFreeTable } from "@/lib/availability";
 import { generateConfirmationCode } from "@/lib/codes";
 import { badRequest, conflict, notFound, slotUnavailable } from "@/lib/errors";
-import { getNotifier, type ReservationNotice } from "@/lib/notify";
+import { notify } from "@/lib/notify";
 import { localDayRangeUtc, utcToLocalParts } from "@/lib/time";
-import { ACTIVE_STATUSES, loadAvailabilityData, type Db } from "./availability-data";
+import { loadAvailabilityData, slotsFor, type Db } from "./availability-data";
 
 type Tx = Prisma.TransactionClient;
 
@@ -22,37 +22,25 @@ type Tx = Prisma.TransactionClient;
 // ---------------------------------------------------------------------------
 
 function isOverlapViolation(e: unknown): boolean {
-  const msg = String((e as { message?: string })?.message ?? "");
-  const meta = JSON.stringify((e as { meta?: unknown })?.meta ?? "");
-  return /Reservation_no_overlap|23P01/.test(msg) || /Reservation_no_overlap|23P01/.test(meta);
-}
-
-function isCodeCollision(e: unknown): boolean {
-  return (
-    e instanceof Prisma.PrismaClientKnownRequestError &&
-    e.code === "P2002" &&
-    JSON.stringify(e.meta ?? "").includes("confirmationCode")
-  );
+  return /Reservation_no_overlap|23P01/.test(String(e) + JSON.stringify((e as { meta?: unknown })?.meta ?? ""));
 }
 
 /** Test seam: lets tests widen the check-then-insert gap to prove the lock/constraint close it. No-op in production. */
 export const testHooks: { afterAvailabilityCheck?: () => Promise<void> } = {};
 
-async function withRestaurantLock<T>(restaurantId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await prisma.$transaction(
-        async (tx) => {
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${restaurantId}))`;
-          return fn(tx);
-        },
-        { timeout: 15_000, maxWait: 15_000 },
-      );
-    } catch (e) {
-      if (isOverlapViolation(e)) throw slotUnavailable();
-      if (isCodeCollision(e) && attempt < 4) continue; // astronomically rare; regenerate the code
-      throw e;
-    }
+export async function withRestaurantLock<T>(restaurantId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${restaurantId}))`;
+        return fn(tx);
+      },
+      { timeout: 15_000, maxWait: 15_000 },
+    );
+  } catch (e) {
+    // ponytail: no retry on a confirmation-code collision (~1 in 10^12); the unique index still rejects it.
+    if (isOverlapViolation(e)) throw slotUnavailable();
+    throw e;
   }
 }
 
@@ -62,25 +50,6 @@ const reservationInclude = {
 } satisfies Prisma.ReservationInclude;
 
 export type ReservationView = Prisma.ReservationGetPayload<{ include: typeof reservationInclude }>;
-
-function notice(r: ReservationView): ReservationNotice {
-  return {
-    confirmationCode: r.confirmationCode,
-    restaurantName: r.restaurant.name,
-    guestName: r.guestName,
-    guestEmail: r.guestEmail,
-    partySize: r.partySize,
-    startsAt: r.startsAt,
-  };
-}
-
-async function safeNotify(fn: () => Promise<void>) {
-  try {
-    await fn();
-  } catch (e) {
-    console.error("[notify] failed", e); // never fail a booking because a notice failed
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Diner: create
@@ -107,20 +76,7 @@ export async function createOnlineReservation(input: CreateOnlineInput): Promise
     const data = await loadAvailabilityData(tx, found.id, date);
     if (!data) throw notFound("Restaurant");
 
-    const slots = generateSlots({
-      date,
-      timezone: tz,
-      hours: data.hours,
-      tables: data.tables,
-      reservations: data.reservations,
-      blocks: data.blocks,
-      slotLengthMinutes: data.restaurant.slotLengthMinutes,
-      slotIntervalMinutes: data.restaurant.slotIntervalMinutes,
-      leadTimeMinutes: data.restaurant.leadTimeMinutes,
-      maxPartySize: data.restaurant.maxPartySize,
-      partySize: input.partySize,
-      now,
-    });
+    const slots = slotsFor(data, { date, partySize: input.partySize, now });
     const slot = slots.find((s) => s.startsAt.getTime() === input.startsAt.getTime());
     if (!slot) throw slotUnavailable();
     await testHooks.afterAvailabilityCheck?.();
@@ -144,7 +100,7 @@ export async function createOnlineReservation(input: CreateOnlineInput): Promise
     });
   });
 
-  await safeNotify(() => getNotifier().reservationConfirmed(notice(created)));
+  notify("confirmed", created);
   return created;
 }
 
@@ -216,7 +172,7 @@ export async function createStaffReservation(input: CreateStaffInput): Promise<R
     });
   });
 
-  if (created.guestEmail) await safeNotify(() => getNotifier().reservationConfirmed(notice(created)));
+  if (created.guestEmail) notify("confirmed", created);
   return created;
 }
 
@@ -267,21 +223,7 @@ export async function modifyReservation(code: string, proof: Proof, input: Modif
     const data = await loadAvailabilityData(tx, existing.restaurantId, date);
     if (!data) throw notFound("Restaurant");
 
-    const slots = generateSlots({
-      date,
-      timezone: tz,
-      hours: data.hours,
-      tables: data.tables,
-      reservations: data.reservations,
-      blocks: data.blocks,
-      slotLengthMinutes: data.restaurant.slotLengthMinutes,
-      slotIntervalMinutes: data.restaurant.slotIntervalMinutes,
-      leadTimeMinutes: data.restaurant.leadTimeMinutes,
-      maxPartySize: data.restaurant.maxPartySize,
-      partySize,
-      now,
-      excludeReservationId: current.id,
-    });
+    const slots = slotsFor(data, { date, partySize, now, excludeReservationId: current.id });
     const slot = slots.find((s) => s.startsAt.getTime() === startsAt.getTime());
     if (!slot) throw slotUnavailable();
 
@@ -311,7 +253,7 @@ export async function modifyReservation(code: string, proof: Proof, input: Modif
     });
   });
 
-  await safeNotify(() => getNotifier().reservationModified(notice(updated)));
+  notify("modified", updated);
   return updated;
 }
 
@@ -326,7 +268,7 @@ export async function cancelReservation(code: string, proof: Proof, now = new Da
   });
   if (res.count === 0) throw conflict("NOT_CANCELLABLE", "This reservation can no longer be cancelled online.");
   const updated = await prisma.reservation.findUniqueOrThrow({ where: { id: existing.id }, include: reservationInclude });
-  await safeNotify(() => getNotifier().reservationCancelled(notice(updated)));
+  notify("cancelled", updated);
   return updated;
 }
 
@@ -387,8 +329,6 @@ export async function setReservationStatus(
   });
   if (res.count === 0) throw conflict("STALE_STATUS", "This reservation was just updated by someone else. Refresh and try again.");
   const updated = await prisma.reservation.findUniqueOrThrow({ where: { id: r.id }, include: reservationInclude });
-  if (next === "CANCELLED") await safeNotify(() => getNotifier().reservationCancelled(notice(updated)));
+  if (next === "CANCELLED") notify("cancelled", updated);
   return updated;
 }
-
-export { ACTIVE_STATUSES };

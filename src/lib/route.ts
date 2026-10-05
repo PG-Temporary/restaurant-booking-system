@@ -4,7 +4,7 @@
 // including routes that take no input (they validate against an empty schema).
 import { z, ZodError, type ZodTypeAny } from "zod";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { restaurantIdOfOwner } from "@/lib/db";
 import { AppError, badRequest, forbidden, unauthorized } from "@/lib/errors";
 import { emptySchema } from "@/lib/schemas";
 
@@ -50,24 +50,16 @@ export function defineRoute<P extends ZodTypeAny = typeof emptySchema, Q extends
   const fn = (async (req: Request, routeCtx?: RouteCtx): Promise<Response> => {
     try {
       // 1. Authentication / authorisation (before any input is trusted).
-      let actor: Actor | null = null;
-      if (opts.auth !== "public") {
-        const session = await auth();
-        if (!session?.user?.id) throw unauthorized();
-        actor = { userId: session.user.id, role: session.user.role, restaurantId: null };
-        if (opts.auth === "owner") {
-          if (actor.role !== "OWNER") throw forbidden();
-          const restaurant = await prisma.restaurant.findUnique({
-            where: { ownerId: actor.userId },
-            select: { id: true },
-          });
-          if (!restaurant) throw forbidden("No restaurant is linked to this account.");
-          actor.restaurantId = restaurant.id;
-        }
-      } else {
-        // Optional identity for public routes (guest or signed-in diner).
-        const session = await auth();
-        if (session?.user?.id) actor = { userId: session.user.id, role: session.user.role, restaurantId: null };
+      // Public routes still pick up an optional identity (guest or signed-in diner).
+      const session = await auth();
+      if (opts.auth !== "public" && !session?.user?.id) throw unauthorized();
+      const actor: Actor | null = session?.user?.id
+        ? { userId: session.user.id, role: session.user.role, restaurantId: null }
+        : null;
+      if (opts.auth === "owner" && actor) {
+        if (actor.role !== "OWNER") throw forbidden();
+        actor.restaurantId = await restaurantIdOfOwner(actor.userId);
+        if (!actor.restaurantId) throw forbidden("No restaurant is linked to this account.");
       }
 
       // 2. Input validation with Zod: params, query, body.

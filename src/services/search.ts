@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/db";
-import { generateSlots } from "@/lib/availability";
 import { boundingBox, haversineKm } from "@/lib/geo";
 import { AppError, notFound } from "@/lib/errors";
-import { loadAvailabilityBatch, loadAvailabilityData } from "./availability-data";
+import { formatTime } from "@/lib/format";
+import { loadAvailabilityBatch, loadAvailabilityData, slotsFor } from "./availability-data";
 import { resolvePlace } from "./restaurants";
 
 export interface SearchInput {
@@ -30,10 +30,6 @@ export interface SearchResult {
   description: string;
   distanceKm: number;
   slots: SearchResultSlot[];
-}
-
-function label(d: Date, tz: string): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 }
 
 /** Restaurants near `location` that have at least one bookable slot for the party on `date`. */
@@ -66,21 +62,7 @@ export async function searchAvailability(input: SearchInput): Promise<{ centre: 
   for (const { r, distanceKm } of near) {
     const d = data.get(r.id);
     if (!d) continue;
-    const slots = generateSlots({
-      date: input.date,
-      timezone: d.restaurant.timezone,
-      hours: d.hours,
-      tables: d.tables,
-      reservations: d.reservations,
-      blocks: d.blocks,
-      slotLengthMinutes: d.restaurant.slotLengthMinutes,
-      slotIntervalMinutes: d.restaurant.slotIntervalMinutes,
-      leadTimeMinutes: d.restaurant.leadTimeMinutes,
-      maxPartySize: d.restaurant.maxPartySize,
-      partySize: input.partySize,
-      now,
-      window: { from: input.from, to: input.to },
-    });
+    const slots = slotsFor(d, { date: input.date, partySize: input.partySize, now, window: { from: input.from, to: input.to } });
     if (slots.length === 0) continue; // only restaurants with REAL availability
     results.push({
       id: r.id,
@@ -90,7 +72,7 @@ export async function searchAvailability(input: SearchInput): Promise<{ centre: 
       address: r.address,
       description: r.description,
       distanceKm: Math.round(distanceKm * 10) / 10,
-      slots: slots.map((s) => ({ startsAt: s.startsAt.toISOString(), label: label(s.startsAt, d.restaurant.timezone) })),
+      slots: slots.map((s) => ({ startsAt: s.startsAt.toISOString(), label: formatTime(s.startsAt, d.restaurant.timezone) })),
     });
   }
   return { centre: { name: place.name, lat: place.lat, lng: place.lng }, results };
@@ -118,24 +100,10 @@ export async function getRestaurantAvailability(input: {
     if (own && own.restaurantId === r.id) excludeReservationId = own.id;
   }
 
-  const slots = generateSlots({
-    date: input.date,
-    timezone: d.restaurant.timezone,
-    hours: d.hours,
-    tables: d.tables,
-    reservations: d.reservations,
-    blocks: d.blocks,
-    slotLengthMinutes: d.restaurant.slotLengthMinutes,
-    slotIntervalMinutes: d.restaurant.slotIntervalMinutes,
-    leadTimeMinutes: d.restaurant.leadTimeMinutes,
-    maxPartySize: d.restaurant.maxPartySize,
-    partySize: input.partySize,
-    now: input.now ?? new Date(),
-    excludeReservationId,
-  });
+  const slots = slotsFor(d, { date: input.date, partySize: input.partySize, now: input.now ?? new Date(), excludeReservationId });
   return {
     restaurant: { name: d.restaurant.name, slug: d.restaurant.slug, timezone: d.restaurant.timezone, maxPartySize: d.restaurant.maxPartySize },
-    slots: slots.map((s) => ({ startsAt: s.startsAt.toISOString(), label: label(s.startsAt, d.restaurant.timezone) })),
+    slots: slots.map((s) => ({ startsAt: s.startsAt.toISOString(), label: formatTime(s.startsAt, d.restaurant.timezone) })),
   };
 }
 

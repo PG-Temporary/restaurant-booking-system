@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { BlockInfo, BusyReservation, HoursInfo, TableInfo } from "@/lib/availability";
+import { generateSlots, type BlockInfo, type BusyReservation, type HoursInfo, type SlotQuery, type TableInfo } from "@/lib/availability";
 import { localDayRangeUtc } from "@/lib/time";
 
 export type Db = PrismaClient | Prisma.TransactionClient;
@@ -86,4 +86,24 @@ export async function loadAvailabilityBatch(
 
 export async function loadAvailabilityData(db: Db, restaurantId: string, date: string): Promise<AvailabilityData | null> {
   return (await loadAvailabilityBatch(db, [restaurantId], date)).get(restaurantId) ?? null;
+}
+
+/** Bookable slots for loaded data: fills the restaurant rules into the engine query. */
+export function slotsFor(
+  d: AvailabilityData,
+  q: Pick<SlotQuery, "date" | "partySize" | "now" | "excludeReservationId" | "window">,
+) {
+  const r = d.restaurant;
+  return generateSlots({
+    ...q,
+    timezone: r.timezone,
+    hours: d.hours,
+    tables: d.tables,
+    reservations: d.reservations,
+    blocks: d.blocks,
+    slotLengthMinutes: r.slotLengthMinutes,
+    slotIntervalMinutes: r.slotIntervalMinutes,
+    leadTimeMinutes: r.leadTimeMinutes,
+    maxPartySize: r.maxPartySize,
+  });
 }

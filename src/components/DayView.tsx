@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import { formatTime, STATUS_LABEL } from "@/lib/format";
-import { utcToLocalParts } from "@/lib/time";
+import { timeToMinutes, utcToLocalParts } from "@/lib/time";
 import { WalkInForm } from "./WalkInForm";
 
 interface Res {
@@ -22,7 +22,6 @@ const NEXT: Record<string, Array<{ to: string; label: string; cls?: string }>> =
   SEATED: [{ to: "COMPLETED", label: "Complete" }],
 };
 const SOURCE: Record<string, string> = { ONLINE: "Online", PHONE: "Phone", WALK_IN: "Walk-in" };
-const hm = (s: string) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
 
 export function DayView(props: { date: string; today: string; timezone: string; tables: Tbl[]; reservations: Res[]; blocks: Blk[]; hours: Hours[] }) {
   const { date, timezone, tables, blocks, hours } = props;
@@ -40,10 +39,10 @@ export function DayView(props: { date: string; today: string; timezone: string; 
 
   useEffect(() => setItems(props.reservations), [props.reservations]);
 
-  const localMin = useCallback((iso: string) => { const [h, m] = utcToLocalParts(new Date(iso), timezone).time.split(":").map(Number); return h * 60 + m; }, [timezone]);
+  const localMin = useCallback((iso: string) => timeToMinutes(utcToLocalParts(new Date(iso), timezone).time), [timezone]);
   const range = useMemo(() => {
-    let start = hours.length ? Math.min(...hours.map((h) => hm(h.opensAt))) : 12 * 60;
-    let end = hours.length ? Math.max(...hours.map((h) => hm(h.closesAt))) : 23 * 60;
+    let start = hours.length ? Math.min(...hours.map((h) => timeToMinutes(h.opensAt))) : 12 * 60;
+    let end = hours.length ? Math.max(...hours.map((h) => timeToMinutes(h.closesAt))) : 23 * 60;
     for (const r of items) {
       start = Math.min(start, localMin(r.startsAt));
       end = Math.max(end, Math.min(localMin(r.endsAt) || 24 * 60, 24 * 60));
@@ -58,7 +57,7 @@ export function DayView(props: { date: string; today: string; timezone: string; 
 
   useEffect(() => {
     if (date !== props.today) return setNowMin(null);
-    const tick = () => { const [h, m] = utcToLocalParts(new Date(), timezone).time.split(":").map(Number); setNowMin(h * 60 + m); };
+    const tick = () => setNowMin(timeToMinutes(utcToLocalParts(new Date(), timezone).time));
     tick();
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
@@ -78,6 +77,7 @@ export function DayView(props: { date: string; today: string; timezone: string; 
     return () => window.removeEventListener("keydown", onKey);
   }, [open, selectedId]);
 
+  const openRes = (id: string) => { setAdding(false); setSelectedId(id); };
   const flash = (text: string, kind: "ok" | "error" = "ok") => {
     setToast({ text, kind });
     window.clearTimeout(toastTimer.current);
@@ -165,7 +165,7 @@ export function DayView(props: { date: string; today: string; timezone: string; 
                         style={{ left: (s - range.start) * PPM, width: Math.max((e - s) * PPM - 4, 56), opacity: r.status === "CANCELLED" ? 0.5 : 1 }}
                         aria-pressed={selectedId === r.id}
                         aria-label={label(r)}
-                        onClick={() => { setAdding(false); setSelectedId(r.id); }}
+                        onClick={() => openRes(r.id)}
                       >
                         <b>{r.guestName}</b>
                         <span>{r.partySize} guests, {STATUS_LABEL[r.status]}</span>
@@ -187,7 +187,7 @@ export function DayView(props: { date: string; today: string; timezone: string; 
         ))}
         {agenda.length === 0 ? <div className="card empty"><h3>No bookings this day</h3><p className="muted">Use New booking to add a walk-in or phone booking.</p></div> : null}
         {agenda.map((r) => (
-          <button key={r.id} type="button" className={`agenda-item ${r.status}`} onClick={() => { setAdding(false); setSelectedId(r.id); }} aria-label={label(r)}>
+          <button key={r.id} type="button" className={`agenda-item ${r.status}`} onClick={() => openRes(r.id)} aria-label={label(r)}>
             <time>{formatTime(r.startsAt, timezone)}</time>
             <span><strong>{r.guestName}</strong><br /><span className="muted small">{r.partySize} guests, table {r.table.name}</span></span>
             <span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span>

@@ -1,12 +1,8 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
-const KEYLEN = 64;
-
-function scrypt(password: string, salt: Buffer): Promise<Buffer> {
-  return new Promise((resolve, reject) =>
-    scryptCb(password, salt, KEYLEN, { N: 16384, r: 8, p: 1 }, (err, key) => (err ? reject(err) : resolve(key))),
-  );
-}
+const scryptAsync = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number, opts: object) => Promise<Buffer>;
+const scrypt = (password: string, salt: Buffer) => scryptAsync(password, salt, 64, { N: 16384, r: 8, p: 1 });
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);

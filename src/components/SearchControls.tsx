@@ -1,11 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef } from "react";
+import { formatDateParts } from "@/lib/format";
 import { addDays } from "@/lib/time";
 
-const fmt = (opts: Intl.DateTimeFormatOptions, date: string) => {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", ...opts }).format(new Date(Date.UTC(y, m - 1, d)));
-};
+const fmt = (opts: Intl.DateTimeFormatOptions, date: string) => formatDateParts(date, opts);
 
 /** Horizontal, swipeable strip of days. `min` is the first selectable day (the restaurant's "today"). */
 export function DateStrip({ min, value, onChange, days = 21, label = "Date", recenterOn }: { min: string; value: string; onChange: (v: string) => void; days?: number; label?: string; recenterOn?: unknown }) {

@@ -4,6 +4,7 @@ import { conflict, badRequest, notFound } from "@/lib/errors";
 import { normalizeLocationKey } from "@/lib/geo";
 import { timeToMinutes, localDayRangeUtc } from "@/lib/time";
 import { ACTIVE_STATUSES } from "./availability-data";
+import { withRestaurantLock } from "./reservations";
 
 export interface HoursInput {
   dayOfWeek: number;
@@ -109,15 +110,15 @@ export async function updateRestaurant(restaurantId: string, input: RestaurantUp
 
 // --- tables -----------------------------------------------------------------
 
-export async function createTable(restaurantId: string, input: { name: string; capacity: number }) {
-  try {
-    return await prisma.table.create({ data: { restaurantId, name: input.name, capacity: input.capacity } });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      throw conflict("TABLE_NAME_TAKEN", "You already have a table with that name.");
-    }
-    throw e;
+function nameTaken(e: unknown): never {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    throw conflict("TABLE_NAME_TAKEN", "You already have a table with that name.");
   }
+  throw e;
+}
+
+export async function createTable(restaurantId: string, input: { name: string; capacity: number }) {
+  return prisma.table.create({ data: { restaurantId, name: input.name, capacity: input.capacity } }).catch(nameTaken);
 }
 
 export async function updateTable(
@@ -144,14 +145,7 @@ export async function updateTable(
       );
     }
   }
-  try {
-    return await prisma.table.update({ where: { id: tableId }, data: input });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      throw conflict("TABLE_NAME_TAKEN", "You already have a table with that name.");
-    }
-    throw e;
-  }
+  return prisma.table.update({ where: { id: tableId }, data: input }).catch(nameTaken);
 }
 
 // --- blocks -----------------------------------------------------------------
@@ -165,43 +159,39 @@ export interface BlockInput {
 
 export async function createBlock(restaurantId: string, input: BlockInput) {
   if (input.endsAt <= input.startsAt) throw badRequest("Block must end after it starts.");
-  return prisma.$transaction(
-    async (tx) => {
-      // Same per-restaurant lock as bookings so a block and a booking cannot race.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${restaurantId}))`;
-      if (input.tableId) {
-        const t = await tx.table.findFirst({ where: { id: input.tableId, restaurantId }, select: { id: true } });
-        if (!t) throw notFound("Table");
-      }
-      const clashes = await tx.reservation.findMany({
-        where: {
-          restaurantId,
-          ...(input.tableId ? { tableId: input.tableId } : {}),
-          status: { in: [...ACTIVE_STATUSES] },
-          startsAt: { lt: input.endsAt },
-          endsAt: { gt: input.startsAt },
-        },
-        select: { confirmationCode: true, startsAt: true, guestName: true },
-      });
-      if (clashes.length > 0) {
-        throw conflict(
-          "BLOCK_CONFLICTS_RESERVATION",
-          `${clashes.length} existing reservation(s) overlap this block. Move or cancel them first.`,
-          clashes,
-        );
-      }
-      return tx.block.create({
-        data: {
-          restaurantId,
-          tableId: input.tableId ?? null,
-          startsAt: input.startsAt,
-          endsAt: input.endsAt,
-          reason: input.reason,
-        },
-      });
-    },
-    { timeout: 15_000, maxWait: 15_000 },
-  );
+  // Same per-restaurant lock as bookings so a block and a booking cannot race.
+  return withRestaurantLock(restaurantId, async (tx) => {
+    if (input.tableId) {
+      const t = await tx.table.findFirst({ where: { id: input.tableId, restaurantId }, select: { id: true } });
+      if (!t) throw notFound("Table");
+    }
+    const clashes = await tx.reservation.findMany({
+      where: {
+        restaurantId,
+        ...(input.tableId ? { tableId: input.tableId } : {}),
+        status: { in: [...ACTIVE_STATUSES] },
+        startsAt: { lt: input.endsAt },
+        endsAt: { gt: input.startsAt },
+      },
+      select: { confirmationCode: true, startsAt: true, guestName: true },
+    });
+    if (clashes.length > 0) {
+      throw conflict(
+        "BLOCK_CONFLICTS_RESERVATION",
+        `${clashes.length} existing reservation(s) overlap this block. Move or cancel them first.`,
+        clashes,
+      );
+    }
+    return tx.block.create({
+      data: {
+        restaurantId,
+        tableId: input.tableId ?? null,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        reason: input.reason,
+      },
+    });
+  });
 }
 
 export async function wholeDayRange(restaurantId: string, date: string) {
