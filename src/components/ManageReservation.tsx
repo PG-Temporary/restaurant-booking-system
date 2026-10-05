@@ -70,7 +70,7 @@ export function ManageReservation(props: {
         )
       ) : null}
       {msg ? <p className={`alert ${msg.kind}`} role={msg.kind === "error" ? "alert" : "status"}>{msg.text}</p> : null}
-      <p><button className="danger" onClick={cancel} disabled={busy}>Cancel booking</button></p>
+      <p style={{ marginTop: 20 }}><button className="danger" onClick={cancel} disabled={busy}>Cancel booking</button></p>
     </section>
   );
 }

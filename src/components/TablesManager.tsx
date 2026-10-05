@@ -39,13 +39,13 @@ export function TablesManager({ tables }: { tables: Tbl[] }) {
           {tables.length === 0 ? <tr><td colSpan={4} className="muted">No tables yet. Add your first one below.</td></tr> : null}
           {tables.map((t) => (
             <tr key={t.id} style={{ opacity: t.active ? 1 : 0.55 }}>
-              <td>{t.name}</td>
-              <td>
+              <td data-label="Table">{t.name}</td>
+              <td data-label="Seats">
                 <input type="number" min={1} max={50} defaultValue={t.capacity} style={{ width: 70 }} aria-label={`Seats for ${t.name}`} disabled={busy}
                   onBlur={(e) => { const v = Number(e.target.value); if (v !== t.capacity && v >= 1) run(() => api(`/api/owner/tables/${t.id}`, "PATCH", { capacity: v })); }} />
               </td>
-              <td>{t.active ? "In use" : "Deactivated"}</td>
-              <td>
+              <td data-label="Status">{t.active ? "In use" : "Deactivated"}</td>
+              <td data-label="">
                 <button className="secondary small" disabled={busy} onClick={() => run(() => api(`/api/owner/tables/${t.id}`, "PATCH", { active: !t.active }))}>
                   {t.active ? "Deactivate" : "Reactivate"}
                 </button>

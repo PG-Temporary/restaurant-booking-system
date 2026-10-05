@@ -51,7 +51,7 @@ export function SearchForm({ defaults, today }: { defaults: SearchDefaults; toda
 
       <div className="field-group span-2">
         <span className="group-label" id="date-label">When</span>
-        <DateStrip min={today} value={date} onChange={setDate} label="Choose a date" />
+        <DateStrip min={today} value={date} onChange={setDate} label="Choose a date" recenterOn={pending} />
         <input type="hidden" name="date" value={date} />
       </div>
 

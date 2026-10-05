@@ -8,7 +8,7 @@ const fmt = (opts: Intl.DateTimeFormatOptions, date: string) => {
 };
 
 /** Horizontal, swipeable strip of days. `min` is the first selectable day (the restaurant's "today"). */
-export function DateStrip({ min, value, onChange, days = 21, label = "Date" }: { min: string; value: string; onChange: (v: string) => void; days?: number; label?: string }) {
+export function DateStrip({ min, value, onChange, days = 21, label = "Date", recenterOn }: { min: string; value: string; onChange: (v: string) => void; days?: number; label?: string; recenterOn?: unknown }) {
   const ref = useRef<HTMLDivElement>(null);
   const dates = useMemo(() => {
     const list = Array.from({ length: days }, (_, i) => addDays(min, i));
@@ -16,9 +16,12 @@ export function DateStrip({ min, value, onChange, days = 21, label = "Date" }: {
     return list.sort();
   }, [min, value, days]);
 
+  // Keep the selected day in view: on mount, when it changes (a tapped chip glides to the centre),
+  // and whenever the parent signals a refresh (e.g. a finished search after keyboard-tabbing the strip).
   useEffect(() => {
-    ref.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, []);
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ref.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: calm ? "auto" : "smooth" });
+  }, [value, recenterOn]);
 
   return (
     <div className="datestrip" ref={ref} role="group" aria-label={label}>

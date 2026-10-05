@@ -613,12 +613,22 @@ body:has(.sheet) .tabbar { display: none; }
 .toast[data-kind="error"] { color: var(--st-cancelled); border-color: var(--st-cancelled); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translateX(-50%); } }
 
+/* Tables turn into stacked rows on phones (labels come from data-label) */
+@media (max-width: 640px) {
+  table.plain thead { display: none; }
+  table.plain, table.plain tbody, table.plain tr, table.plain td { display: block; width: 100%; }
+  table.plain tr { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  table.plain td { display: flex; gap: 12px; align-items: center; justify-content: space-between; border: 0; padding: 4px 0; }
+  table.plain td::before { content: attr(data-label); color: var(--muted); font-size: 0.8rem; }
+  table.plain td[data-label=""]::before { content: none; }
+}
+
 /* Setup: hours editor */
 .hours-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .hours-row:last-of-type { border-bottom: 0; }
 .hours-windows { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.win { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--surface-strong); }
-.win input { min-height: 36px; padding: 4px 8px; border-radius: 8px; }
+.win { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 10px; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--surface-strong); }
+.win input { min-height: 36px; padding: 4px 8px; border-radius: 8px; flex: 1 1 104px; min-width: 0; }
 @media (max-width: 560px) { .hours-row { grid-template-columns: 1fr; } }
 
 /* --------------------------------------------------------------------------

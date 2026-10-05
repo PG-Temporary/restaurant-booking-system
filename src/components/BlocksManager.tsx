@@ -79,11 +79,11 @@ export function BlocksManager(props: { timezone: string; today: string; tables: 
           <tbody>
             {props.blocks.map((b) => (
               <tr key={b.id}>
-                <td>{formatDateTime(b.startsAt, props.timezone)}</td>
-                <td>{formatDateTime(b.endsAt, props.timezone)}</td>
-                <td>{b.tableName ? `Table ${b.tableName}` : "Whole restaurant"}</td>
-                <td>{b.reason || "—"}</td>
-                <td><button className="secondary small" disabled={busy} onClick={() => remove(b.id)}>Remove</button></td>
+                <td data-label="From">{formatDateTime(b.startsAt, props.timezone)}</td>
+                <td data-label="To">{formatDateTime(b.endsAt, props.timezone)}</td>
+                <td data-label="Applies to">{b.tableName ? `Table ${b.tableName}` : "Whole restaurant"}</td>
+                <td data-label="Reason">{b.reason || "None"}</td>
+                <td data-label=""><button className="secondary small" disabled={busy} onClick={() => remove(b.id)}>Remove</button></td>
               </tr>
             ))}
           </tbody>
