@@ -21,7 +21,7 @@ export function LoginForm() {
     router.refresh();
   }
   return (
-    <form className="card grid" onSubmit={onSubmit} style={{ maxWidth: 420 }}>
+    <form className="grid" onSubmit={onSubmit}>
       <label>Email<input type="email" name="email" required autoComplete="email" /></label>
       <label>Password<input type="password" name="password" required autoComplete="current-password" /></label>
       {error ? <p className="alert error" role="alert">{error}</p> : null}
@@ -30,9 +30,9 @@ export function LoginForm() {
   );
 }
 
-export function RegisterForm() {
+export function RegisterForm({ defaultRole = "DINER" }: { defaultRole?: "DINER" | "OWNER" }) {
   const router = useRouter();
-  const [role, setRole] = useState<"DINER" | "OWNER">("DINER");
+  const [role, setRole] = useState<"DINER" | "OWNER">(defaultRole);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -60,7 +60,7 @@ export function RegisterForm() {
     router.refresh();
   }
   return (
-    <form className="card grid" onSubmit={onSubmit} style={{ maxWidth: 460 }}>
+    <form className="grid" onSubmit={onSubmit}>
       <fieldset style={{ border: 0, padding: 0, display: "flex", gap: 16 }}>
         <legend className="muted small">I am a…</legend>
         <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="radio" checked={role === "DINER"} onChange={() => setRole("DINER")} /> Diner</label>

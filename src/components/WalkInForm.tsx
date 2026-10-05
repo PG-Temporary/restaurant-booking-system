@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/client";
 import { utcToLocalParts, zonedWallTimeToUtc } from "@/lib/time";
 
-export function WalkInForm({ date, timezone, tables }: { date: string; timezone: string; tables: Array<{ id: string; name: string; capacity: number }> }) {
+export function WalkInForm({ date, timezone, tables, onDone }: { date: string; timezone: string; tables: Array<{ id: string; name: string; capacity: number }>; onDone?: (message: string) => void }) {
   const router = useRouter();
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -28,13 +28,15 @@ export function WalkInForm({ date, timezone, tables }: { date: string; timezone:
     });
     setBusy(false);
     if (!res.ok) return setMsg({ kind: "error", text: res.error ?? "Could not add booking." });
-    setMsg({ kind: "ok", text: `Added on table ${res.data!.table.name} (code ${res.data!.confirmationCode}).` });
+    const text = `Added on table ${res.data!.table.name} (code ${res.data!.confirmationCode}).`;
     form.reset();
     router.refresh();
+    if (onDone) return onDone(text);
+    setMsg({ kind: "ok", text });
   }
 
   return (
-    <form className="card grid" onSubmit={onSubmit}>
+    <form className="grid" onSubmit={onSubmit}>
       <div className="row">
         <label>Type<select name="source" defaultValue="WALK_IN"><option value="WALK_IN">Walk-in (seated now)</option><option value="PHONE">Phone booking</option></select></label>
         <label>Time<input type="time" name="time" step={300} defaultValue={defaultTime} required /></label>
@@ -53,7 +55,7 @@ export function WalkInForm({ date, timezone, tables }: { date: string; timezone:
       </div>
       <label>Notes<input name="notes" maxLength={500} /></label>
       {msg ? <p className={`alert ${msg.kind}`} role={msg.kind === "error" ? "alert" : "status"}>{msg.text}</p> : null}
-      <div><button type="submit" disabled={busy}>{busy ? "Adding…" : "Add booking"}</button></div>
+      <div><button type="submit" className="big" disabled={busy}>{busy ? "Adding…" : "Add booking"}</button></div>
     </form>
   );
 }

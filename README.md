@@ -36,6 +36,13 @@ npm run dev                   # http://localhost:3000
 All use the password `password123`: owners `owner.trattoria@example.com`, `owner.sakura@example.com`, `owner.thames@example.com`, `owner.spice@example.com`, `owner.northern@example.com`; diner `diner@example.com`.
 Try the search with location `E1`, a party of 6, and a Friday evening.
 
+## The experience
+
+- **Splash and gateway (`/`).** A live-gradient splash with blur and film grain plays once per browser session (tap, Enter, Space or "Skip" ends it early), then asks "Are you dining or running a restaurant?". The choice is remembered in `localStorage`; the **Switch** control in either shell (or `/?switch=1`) clears it.
+- **Customer (mobile first, `/find`, `/restaurants/:slug`, `/book/:slug`, `/reservations/:code`, `/manage`, `/account`).** Bottom tab bar on phones, swipeable date strip, guest stepper, time-of-day chips, a booking summary sheet pinned to the bottom of the screen, and an animated confirmation ticket. No account needed.
+- **Business (tablet / desktop first, `/dashboard`, `/dashboard/blocks`, `/dashboard/setup`).** Sidebar rail, a day view with one lane per table on a time axis (with a "now" line), one-tap Seat / No-show / Cancel / Complete from a detail panel with instant feedback, and a "New booking" slide-over for walk-ins and phone bookings. On phones the timeline becomes a chronological agenda.
+- **Shared look.** One token set in `src/app/globals.css` (colour, radius, blur, motion, z-index) with automatic light and dark themes, glass surfaces, a drifting aurora backdrop and static film grain. Everything honours `prefers-reduced-motion` (live gradients and loops stop) and `prefers-reduced-transparency`. No UI or animation libraries: CSS and small client components only.
+
 ### Scripts
 
 | Script | What it does |

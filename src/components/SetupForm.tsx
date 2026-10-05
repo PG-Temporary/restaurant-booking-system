@@ -50,7 +50,7 @@ export function SetupForm({ initial }: { initial: SetupInitial }) {
 
   return (
     <form className="grid" onSubmit={onSubmit}>
-      <fieldset className="card grid" style={{ border: "1px solid var(--border)" }}>
+      <fieldset className="card grid">
         <legend>Details</legend>
         <label>Restaurant name<input name="name" defaultValue={initial.name} required maxLength={120} /></label>
         <label>Description<textarea name="description" rows={2} defaultValue={initial.description} maxLength={2000} /></label>
@@ -68,7 +68,7 @@ export function SetupForm({ initial }: { initial: SetupInitial }) {
         <p className="muted small" style={{ margin: 0 }}>Leave latitude/longitude blank and we&apos;ll place you from your postcode or city.</p>
       </fieldset>
 
-      <fieldset className="card grid" style={{ border: "1px solid var(--border)" }}>
+      <fieldset className="card grid">
         <legend>Booking rules</legend>
         <div className="row">
           <label>Table hold time (minutes)<input name="slotLengthMinutes" type="number" min={15} max={480} step={5} defaultValue={initial.slotLengthMinutes} required /></label>
@@ -78,30 +78,34 @@ export function SetupForm({ initial }: { initial: SetupInitial }) {
         </div>
       </fieldset>
 
-      <fieldset className="card grid" style={{ border: "1px solid var(--border)" }}>
+      <fieldset className="card grid">
         <legend>Opening hours</legend>
-        <p className="muted small" style={{ margin: 0 }}>Add several windows for a day to model lunch and dinner. Overnight service isn&apos;t supported yet - close by 23:59.</p>
-        {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-          <div key={d} className="row" style={{ alignItems: "center" }}>
-            <strong style={{ width: 100 }}>{DAY_NAMES[d]}</strong>
-            {hours.every((h) => h.dayOfWeek !== d) ? <span className="muted">Closed</span> : null}
-            {hours.map((h, i) =>
-              h.dayOfWeek !== d ? null : (
-                <span key={i} className="row" style={{ alignItems: "center", gap: 6 }}>
-                  <input type="time" value={h.opensAt} onChange={(e) => update(i, { opensAt: e.target.value })} aria-label={`${DAY_NAMES[d]} opens`} required />
-                  –
-                  <input type="time" value={h.closesAt} onChange={(e) => update(i, { closesAt: e.target.value })} aria-label={`${DAY_NAMES[d]} closes`} required />
-                  <button type="button" className="secondary small" onClick={() => setHours((x) => x.filter((_, j) => j !== i))} aria-label={`Remove ${DAY_NAMES[d]} window`}>✕</button>
-                </span>
-              ),
-            )}
-            <button type="button" className="secondary small" onClick={() => setHours((x) => [...x, { dayOfWeek: d, opensAt: "17:00", closesAt: "22:00" }])}>+ Add hours</button>
-          </div>
-        ))}
+        <p className="muted small" style={{ margin: 0 }}>Add several windows for a day to model lunch and dinner. Overnight service isn&apos;t supported yet, so close by 23:59.</p>
+        <div>
+          {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+            <div key={d} className="hours-row">
+              <strong>{DAY_NAMES[d]}</strong>
+              <div className="hours-windows">
+                {hours.every((h) => h.dayOfWeek !== d) ? <span className="muted">Closed</span> : null}
+                {hours.map((h, i) =>
+                  h.dayOfWeek !== d ? null : (
+                    <span key={i} className="win">
+                      <input type="time" value={h.opensAt} onChange={(e) => update(i, { opensAt: e.target.value })} aria-label={`${DAY_NAMES[d]} opens`} required />
+                      to
+                      <input type="time" value={h.closesAt} onChange={(e) => update(i, { closesAt: e.target.value })} aria-label={`${DAY_NAMES[d]} closes`} required />
+                      <button type="button" className="secondary small" onClick={() => setHours((x) => x.filter((_, j) => j !== i))} aria-label={`Remove ${DAY_NAMES[d]} window`}>Remove</button>
+                    </span>
+                  ),
+                )}
+                <button type="button" className="secondary small" onClick={() => setHours((x) => [...x, { dayOfWeek: d, opensAt: "17:00", closesAt: "22:00" }])}>Add hours</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </fieldset>
 
       {msg ? <p className={`alert ${msg.kind}`} role={msg.kind === "error" ? "alert" : "status"}>{msg.text}</p> : null}
-      <div><button type="submit" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button></div>
+      <div><button type="submit" className="big" style={{ maxWidth: 320 }} disabled={busy}>{busy ? "Saving…" : "Save settings"}</button></div>
     </form>
   );
 }

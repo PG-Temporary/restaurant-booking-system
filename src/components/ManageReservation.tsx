@@ -55,7 +55,7 @@ export function ManageReservation(props: {
   return (
     <section>
       <h2>Change or cancel</h2>
-      <form className="card row" onSubmit={checkTimes}>
+      <form className="card row" onSubmit={checkTimes} style={{ alignItems: "flex-end" }}>
         <label>New date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
         <label>Party size<input type="number" min={1} max={50} value={party} onChange={(e) => setParty(Number(e.target.value))} required style={{ width: 90 }} /></label>
         <button type="submit" className="secondary" disabled={busy}>Show available times</button>
@@ -64,7 +64,7 @@ export function ManageReservation(props: {
         slots.length === 0 ? <p>No tables available then. Try another date or party size.</p> : (
           <div className="slots">
             {slots.map((s) => (
-              <button key={s.startsAt} className="secondary" disabled={busy} onClick={() => choose(s.startsAt)}>{s.label}</button>
+              <button key={s.startsAt} type="button" className="slot" disabled={busy} onClick={() => choose(s.startsAt)}>{s.label}</button>
             ))}
           </div>
         )
