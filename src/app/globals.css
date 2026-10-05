@@ -1,0 +1,55 @@
+:root {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --text: #1f1d1a;
+  --muted: #6b6760;
+  --border: #e4dfd6;
+  --brand: #b4381f;
+  --brand-dark: #8f2b17;
+  --ok: #2a7d4f;
+  --warn: #b7791f;
+  --danger: #b42318;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141311; --surface: #1d1b18; --text: #f1ede6; --muted: #a29d93; --border: #34312c; --brand: #e0674d; --brand-dark: #ee8a74; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+a { color: var(--brand); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+header.site { border-bottom: 1px solid var(--border); background: var(--surface); }
+header.site .inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+header.site .brand { font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--text); }
+header.site nav { display: flex; gap: 14px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+h1 { font-size: 1.8rem; margin: 0 0 8px; } h2 { font-size: 1.25rem; margin: 28px 0 10px; } h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.muted { color: var(--muted); } .small { font-size: .875rem; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.grid { display: grid; gap: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+label { display: grid; gap: 4px; font-size: .875rem; color: var(--muted); }
+input, select, textarea { font: inherit; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+button, .btn { font: inherit; cursor: pointer; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--brand); background: var(--brand); color: #fff; text-decoration: none; display: inline-block; }
+button:hover, .btn:hover { background: var(--brand-dark); }
+button.secondary, .btn.secondary { background: transparent; color: var(--brand); }
+button.danger { background: var(--danger); border-color: var(--danger); }
+button.small, .btn.small { padding: 4px 10px; font-size: .85rem; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.slots { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.slot { padding: 6px 12px; border: 1px solid var(--brand); border-radius: 999px; text-decoration: none; color: var(--brand); font-weight: 600; }
+.slot:hover { background: var(--brand); color: #fff; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; border: 1px solid var(--border); }
+.badge.CONFIRMED { color: var(--brand); border-color: var(--brand); } .badge.SEATED { color: var(--ok); border-color: var(--ok); }
+.badge.COMPLETED { color: var(--muted); } .badge.NO_SHOW { color: var(--warn); border-color: var(--warn); } .badge.CANCELLED { color: var(--danger); border-color: var(--danger); text-decoration: line-through; }
+.alert { padding: 10px 14px; border-radius: 8px; border: 1px solid; margin: 12px 0; }
+.alert.error { color: var(--danger); border-color: var(--danger); } .alert.ok { color: var(--ok); border-color: var(--ok); } .alert.info { color: var(--warn); border-color: var(--warn); }
+.columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: grid; gap: 8px; align-content: start; }
+.res { border: 1px solid var(--border); border-radius: 8px; padding: 8px; display: grid; gap: 4px; }
+.res.blocked { background: repeating-linear-gradient(45deg, transparent, transparent 6px, var(--border) 6px, var(--border) 7px); }
+.tabs { display: flex; gap: 6px; margin: 10px 0 16px; flex-wrap: wrap; }
+.tabs a { padding: 6px 12px; border-radius: 8px; text-decoration: none; border: 1px solid var(--border); color: var(--text); }
+.tabs a[aria-current="page"] { background: var(--brand); color: #fff; border-color: var(--brand); }
+table.plain { border-collapse: collapse; width: 100%; } table.plain td, table.plain th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+@media (max-width: 640px) { main { padding: 16px 12px 48px; } h1 { font-size: 1.5rem; } .row > * { flex: 1 1 140px; } }

@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DINER
+  OWNER
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum ReservationSource {
+  ONLINE
+  WALK_IN
+  PHONE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  restaurant   Restaurant?
+  reservations Reservation[]
+}
+
+model Restaurant {
+  id          String  @id @default(cuid())
+  ownerId     String  @unique
+  name        String
+  slug        String  @unique
+  description String  @default("")
+  address     String  @default("")
+  city        String  @default("")
+  postcode    String  @default("")
+  latitude    Float?
+  longitude   Float?
+  /// IANA timezone, e.g. Europe/London. All stored instants are UTC.
+  timezone    String  @default("Europe/London")
+
+  /// How long a reservation holds a table.
+  slotLengthMinutes     Int @default(90)
+  /// Granularity of bookable start times (e.g. 30 => 18:00, 18:30, ...).
+  slotIntervalMinutes   Int @default(30)
+  /// Minimum notice for ONLINE bookings.
+  leadTimeMinutes       Int @default(60)
+  /// Largest party accepted for ONLINE bookings.
+  maxPartySize          Int @default(8)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner        User          @relation(fields: [ownerId], references: [id])
+  tables       Table[]
+  openingHours OpeningHours[]
+  blocks       Block[]
+  reservations Reservation[]
+
+  @@index([city])
+  @@index([postcode])
+  @@index([latitude, longitude])
+}
+
+model Table {
+  id           String  @id @default(cuid())
+  restaurantId String
+  name         String
+  capacity     Int
+  active       Boolean @default(true)
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+  blocks       Block[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("restaurant_tables")
+}
+
+model OpeningHours {
+  id           String @id @default(cuid())
+  restaurantId String
+  /// 0 = Sunday ... 6 = Saturday, in the restaurant's local time.
+  dayOfWeek    Int
+  /// Local wall-clock "HH:mm". closesAt must be later than opensAt (no overnight service in v1).
+  opensAt      String
+  closesAt     String
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, dayOfWeek])
+}
+
+model Block {
+  id           String   @id @default(cuid())
+  restaurantId String
+  /// null => the whole restaurant is blocked.
+  tableId      String?
+  startsAt     DateTime
+  endsAt       DateTime
+  reason       String   @default("")
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      Table?     @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, startsAt])
+}
+
+model Reservation {
+  id               String            @id @default(cuid())
+  confirmationCode String            @unique
+  restaurantId     String
+  tableId          String
+  userId           String?
+  guestName        String
+  guestEmail       String
+  guestPhone       String
+  partySize        Int
+  startsAt         DateTime
+  endsAt           DateTime
+  status           ReservationStatus @default(CONFIRMED)
+  source           ReservationSource @default(ONLINE)
+  notes            String            @default("")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      Table      @relation(fields: [tableId], references: [id])
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([restaurantId, startsAt])
+  @@index([tableId, startsAt])
+  @@index([userId])
+  @@index([guestEmail])
+}
+
+/// Local gazetteer used to turn a typed city / postcode into coordinates (no external geocoder).
+model GeoPlace {
+  id   String @id @default(cuid())
+  /// Lowercased, whitespace-stripped lookup key, e.g. "london" or "e18".
+  key  String @unique
+  name String
+  lat  Float
+  lng  Float
+}
